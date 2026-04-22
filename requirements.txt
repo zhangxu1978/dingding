@@ -1,0 +1,2 @@
+dingtalk-stream>=0.24.3
+flask>=3.0.0

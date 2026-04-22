@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>钉钉消息助手</title>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── 左侧会话列表 ──────────────────────────────────────── */
+    #sidebar {
+      width: 260px;
+      min-width: 200px;
+      background: #fff;
+      border-right: 1px solid #e8e8e8;
+      display: flex;
+      flex-direction: column;
+    }
+    #sidebar-header {
+      padding: 18px 16px 14px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a1a1a;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #sidebar-header .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #52c41a;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100%{opacity:1} 50%{opacity:.4}
+    }
+    #session-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .session-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid #f5f5f5;
+      transition: background .15s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .session-item:hover { background: #f7f8fa; }
+    .session-item.active { background: #e6f4ff; }
+    .session-avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg,#1677ff,#36cfc9);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 600;
+      flex-shrink: 0;
+    }
+    .session-info { flex: 1; overflow: hidden; }
+    .session-name {
+      font-size: 14px; font-weight: 500;
+      color: #262626;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .session-preview {
+      font-size: 12px; color: #8c8c8c;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    .session-badge {
+      min-width: 18px; height: 18px;
+      background: #ff4d4f;
+      border-radius: 9px;
+      color: #fff; font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* ── 主聊天区 ──────────────────────────────────────────── */
+    #chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #chat-header {
+      background: #fff;
+      padding: 14px 20px;
+      border-bottom: 1px solid #e8e8e8;
+      font-size: 15px;
+      font-weight: 600;
+      color: #262626;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #chat-type-tag {
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: #f0f5ff;
+      color: #1677ff;
+      font-weight: 400;
+    }
+
+    /* ── 消息列表 ─────────────────────────────────────────── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .msg-row {
+      display: flex;
+      gap: 10px;
+      max-width: 75%;
+    }
+    .msg-row.out {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .msg-avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .msg-row.in .msg-avatar  { background: linear-gradient(135deg,#fa8c16,#ffd666); }
+    .msg-row.out .msg-avatar { background: linear-gradient(135deg,#1677ff,#69b1ff); }
+    .msg-body { display: flex; flex-direction: column; gap: 3px; }
+    .msg-meta {
+      font-size: 11px; color: #bfbfbf;
+      display: flex; gap: 6px;
+    }
+    .msg-row.out .msg-meta { justify-content: flex-end; }
+    .msg-bubble {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .msg-row.in  .msg-bubble { background: #fff; color: #262626; border-top-left-radius: 4px; }
+    .msg-row.out .msg-bubble { background: #1677ff; color: #fff; border-top-right-radius: 4px; }
+
+    /* ── 图片消息 ─────────────────────────────────────────── */
+    .msg-bubble img.msg-image {
+      max-width: 240px;
+      max-height: 240px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+    }
+
+    /* ── 语音消息 ─────────────────────────────────────────── */
+    .msg-audio {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      min-width: 100px;
+    }
+    .msg-audio .play-btn {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: #1677ff;
+      border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .msg-audio .play-btn svg { fill: #fff; width: 14px; height: 14px; }
+    .msg-audio .duration { font-size: 12px; color: #8c8c8c; }
+    .msg-row.in  .msg-audio .play-btn { background: #fa8c16; }
+    .msg-audio.playing .play-btn { background: #52c41a; }
+
+    /* ── 图片预览 ─────────────────────────────────────────── */
+    #image-preview {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    #image-preview img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+    }
+    #image-preview .close-btn {
+      position: absolute;
+      top: 20px; right: 20px;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.2);
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── 空状态 ──────────────────────────────────────────── */
+    #empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #bfbfbf;
+      gap: 12px;
+      font-size: 14px;
+    }
+    #empty-state svg { opacity: .4; }
+
+    /* ── 输入区 ──────────────────────────────────────────── */
+    #input-area {
+      background: #fff;
+      border-top: 1px solid #e8e8e8;
+      padding: 14px 20px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    #reply-input {
+      flex: 1;
+      resize: none;
+      border: 1px solid #d9d9d9;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      outline: none;
+      transition: border-color .2s;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    #reply-input:focus { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,.1); }
+    #send-btn {
+      height: 40px;
+      padding: 0 20px;
+      background: #1677ff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background .2s;
+      white-space: nowrap;
+    }
+    #send-btn:hover { background: #4096ff; }
+    #send-btn:disabled { background: #d9d9d9; cursor: not-allowed; }
+
+    /* ── Toast ─────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 32px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(0,0,0,.75);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity .3s, transform .3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d9d9d9; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- 左侧会话列表 -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <span class="dot"></span>
+    <span>钉钉消息助手</span>
+  </div>
+  <div id="session-list">
+    <!-- 由 JS 动态渲染 -->
+  </div>
+</div>
+
+<!-- 主聊天区 -->
+<div id="chat-area">
+  <div id="chat-header">
+    <span id="chat-title">请选择会话</span>
+    <span id="chat-type-tag" style="display:none"></span>
+  </div>
+
+  <div id="empty-state">
+    <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+      <circle cx="32" cy="32" r="30" stroke="#d9d9d9" stroke-width="2"/>
+      <path d="M20 26h24M20 34h16" stroke="#d9d9d9" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <span>暂无消息，等待钉钉消息到来…</span>
+    <span style="font-size:12px;color:#d9d9d9">请确保 config.py 中的 AppKey / AppSecret 已填写正确</span>
+  </div>
+
+  <div id="messages" style="display:none"></div>
+
+  <div id="input-area" style="display:none">
+    <textarea id="reply-input" rows="2" placeholder="输入回复内容，Enter 发送，Shift+Enter 换行…"></textarea>
+    <button id="send-btn">发 送</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="image-preview">
+  <button class="close-btn" onclick="closeImagePreview()">×</button>
+  <img id="preview-img" src="" alt="预览">
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// 状态
+// ─────────────────────────────────────────────────────────────────────────────
+let sessions    = {};        // session_key -> { sender, conversation_type, messages:[], unread:0 }
+let activeKey   = null;
+let lastId      = 0;
+let pollTimer   = null;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 工具
+// ─────────────────────────────────────────────────────────────────────────────
+function toast(msg, ms = 2000) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), ms);
+}
+
+function avatarLetter(name) {
+  return (name || "?")[0].toUpperCase();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 侧边栏
+// ─────────────────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById("session-list");
+  if (Object.keys(sessions).length === 0) {
+    list.innerHTML = '<div style="padding:24px 16px;color:#bfbfbf;font-size:13px;text-align:center;">暂无会话</div>';
+    return;
+  }
+  list.innerHTML = Object.entries(sessions).map(([key, s]) => {
+    const last = s.messages.at(-1);
+    const preview = last ? (last.direction === "out" ? "我：" : "") + last.text : "暂无消息";
+    const badgeHtml = s.unread > 0
+      ? `<div class="session-badge">${s.unread > 99 ? "99+" : s.unread}</div>` : "";
+    return `
+      <div class="session-item ${key === activeKey ? "active" : ""}" onclick="selectSession('${key}')">
+        <div class="session-avatar">${avatarLetter(s.sender)}</div>
+        <div class="session-info">
+          <div class="session-name">${escHtml(s.sender)}</div>
+          <div class="session-preview">${escHtml(preview.slice(0, 30))}</div>
+        </div>
+        ${badgeHtml}
+      </div>`;
+  }).join("");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 切换会话
+// ─────────────────────────────────────────────────────────────────────────────
+function selectSession(key) {
+  activeKey = key;
+  const s = sessions[key];
+  s.unread = 0;
+  renderSidebar();
+  renderMessages();
+  // 显示聊天区
+  document.getElementById("empty-state").style.display = "none";
+  document.getElementById("messages").style.display = "flex";
+  document.getElementById("input-area").style.display = "flex";
+  // 更新 header
+  document.getElementById("chat-title").textContent = s.sender;
+  const tag = document.getElementById("chat-type-tag");
+  tag.textContent = s.conversation_type === "2" ? "群聊" : "单聊";
+  tag.style.display = "inline-block";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 渲染消息列表
+// ─────────────────────────────────────────────────────────────────────────────
+function renderMessages() {
+  if (!activeKey) return;
+  const s = sessions[activeKey];
+  const container = document.getElementById("messages");
+  container.innerHTML = s.messages.map(m => `
+    <div class="msg-row ${m.direction}">
+      <div class="msg-avatar">${avatarLetter(m.sender)}</div>
+      <div class="msg-body">
+        <div class="msg-meta">
+          <span>${escHtml(m.sender)}</span>
+          <span>${m.ts}</span>
+        </div>
+        <div class="msg-bubble">${renderMsgBubble(m)}</div>
+      </div>
+    </div>`).join("");
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendMessage(m) {
+  if (activeKey !== m.session_key) return;
+  const s = sessions[m.session_key];
+  const container = document.getElementById("messages");
+  const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
+  const div = document.createElement("div");
+  div.className = `msg-row ${m.direction}`;
+  div.innerHTML = `
+    <div class="msg-avatar">${avatarLetter(m.sender)}</div>
+    <div class="msg-body">
+      <div class="msg-meta"><span>${escHtml(m.sender)}</span><span>${m.ts}</span></div>
+      <div class="msg-bubble">${renderMsgBubble(m)}</div>
+    </div>`;
+  container.appendChild(div);
+  if (atBottom) container.scrollTop = container.scrollHeight;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 轮询新消息
+// ─────────────────────────────────────────────────────────────────────────────
+async function poll() {
+  try {
+    const res = await fetch(`/api/messages?since_id=${lastId}`);
+    const data = await res.json();
+    for (const m of data.messages) {
+      lastId = Math.max(lastId, m.id);
+      // 保存到会话
+      const key = m.session_key;
+      if (!sessions[key]) {
+        sessions[key] = {
+          sender: m.sender,
+          conversation_type: m.conversation_type,
+          messages: [],
+          unread: 0,
+        };
+      }
+      sessions[key].messages.push(m);
+      if (m.direction === "in" && key !== activeKey) {
+        sessions[key].unread++;
+      }
+      if (key === activeKey) appendMessage(m);
+      renderSidebar();
+
+      // 浏览器通知
+      if (m.direction === "in" && document.hidden && Notification.permission === "granted") {
+        new Notification(`${m.sender}`, { body: m.text, icon: "/static/icon.png" });
+      }
+    }
+  } catch (e) {
+    // 静默失败，等下次轮询
+  }
+  pollTimer = setTimeout(poll, 1500);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 发送回复
+// ─────────────────────────────────────────────────────────────────────────────
+async function sendReply() {
+  if (!activeKey) return toast("请先选择一个会话");
+  const input = document.getElementById("reply-input");
+  const text  = input.value.trim();
+  if (!text) return;
+
+  document.getElementById("send-btn").disabled = true;
+  try {
+    const res = await fetch("/api/reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_key: activeKey, text }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      input.value = "";
+      autoResize(input);
+      toast("发送成功");
+    } else {
+      toast("发送失败：" + (data.error || "未知错误"), 3000);
+    }
+  } catch (e) {
+    toast("网络错误", 3000);
+  } finally {
+    document.getElementById("send-btn").disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 输入框自适应高度
+// ─────────────────────────────────────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+function closeImagePreview() {
+  document.getElementById("image-preview").style.display = "none";
+}
+
+function renderMsgBubble(m) {
+  if (m.msg_type === "picture" && m.file_url) {
+    return `<img class="msg-image" src="${escHtml(m.file_url)}" onclick="showImagePreview('${escHtml(m.file_url)}')" alt="图片">`;
+  }
+  if (m.msg_type === "audio" && m.file_url) {
+    const dur = m.duration ? m.duration + "秒" : "";
+    return `<div class="msg-audio" onclick="playAudio(this, '${escHtml(m.file_url)}')">
+      <button class="play-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+      <span class="duration">${escHtml(dur)}</span>
+    </div>`;
+  }
+  return escHtml(m.text || "");
+}
+
+function showImagePreview(url) {
+  const preview = document.getElementById("image-preview");
+  document.getElementById("preview-img").src = url;
+  preview.style.display = "flex";
+}
+
+function playAudio(el, url) {
+  if (el.classList.contains("playing")) {
+    el.classList.remove("playing");
+    el._audio && el._audio.pause();
+    return;
+  }
+  document.querySelectorAll(".msg-audio.playing").forEach(e => {
+    e.classList.remove("playing");
+    e._audio && e._audio.pause();
+  });
+  el.classList.add("playing");
+  const audio = new Audio(url);
+  el._audio = audio;
+  audio.onended = () => el.classList.remove("playing");
+  audio.play();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 初始化
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  // 请求通知权限
+  if (Notification.permission === "default") Notification.requestPermission();
+
+  // Enter 发送，Shift+Enter 换行
+  const input = document.getElementById("reply-input");
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendReply();
+    }
+  });
+  input.addEventListener("input", () => autoResize(input));
+
+  document.getElementById("send-btn").addEventListener("click", sendReply);
+
+  // 初始渲染
+  renderSidebar();
+  poll();
+});
+</script>
+</body>
+</html>
