@@ -5,12 +5,14 @@ Flask Web 服务 — 提供对话监控页面和回复接口。
 启动时同步拉起 dingtalk_bot 线程。
 """
 
+import os
 from flask import Flask, jsonify, render_template, request
 
 import config
 from dingtalk_bot import get_messages, reply_to_session, start_bot_thread
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, static_folder=os.path.join(BASE_DIR, "static"), static_url_path="/static")
 
 
 @app.route("/")

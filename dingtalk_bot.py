@@ -39,9 +39,6 @@ _session_lock = threading.Lock()
 
 _id_counter = 0
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 
 def _next_id() -> int:
     global _id_counter
@@ -49,18 +46,81 @@ def _next_id() -> int:
     return _id_counter
 
 
-def _download_dingtalk_file(download_code: str, file_extension: str) -> str | None:
-    url = f"https://oapi.dingtalk.com/media/download?access_token=&media_id={download_code}"
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+_access_token: str | None = None
+_token_expire_time: float = 0
+
+
+def _get_access_token() -> str | None:
+    global _access_token, _token_expire_time
+    import time
+    if _access_token and time.time() < _token_expire_time - 300:
+        return _access_token
+
+    url = "https://api.dingtalk.com/v1.0/oauth2/accessToken"
+    payload = {"appKey": config.APP_KEY, "appSecret": config.APP_SECRET}
     try:
-        resp = requests.get(url, timeout=15)
-        if resp.status_code == 200 and resp.content:
-            filename = f"{download_code[:16]}.{file_extension}"
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
-            with open(filepath, "wb") as f:
-                f.write(resp.content)
-            return f"/static/uploads/{filename}"
+        resp = requests.post(url, json=payload, timeout=10)
+        data = resp.json()
+        if data.get("accessToken"):
+            _access_token = data["accessToken"]
+            _token_expire_time = time.time() + data.get("expireIn", 7200)
+            logger.info("获取 access_token 成功")
+            return _access_token
     except Exception as e:
-        logger.error("下载文件失败: %s", e)
+        logger.error("获取 access_token 失败: %s", e)
+    return None
+
+
+def _download_dingtalk_file(download_code: str, file_extension: str) -> str | None:
+    token = _get_access_token()
+    if not token:
+        logger.error("无法获取 access_token")
+        return None
+
+    headers = {
+        "x-acs-dingtalk-access-token": token,
+        "Content-Type": "application/json",
+    }
+    body = {
+        "downloadCode": download_code,
+        "robotCode": config.ROBOT_CODE,
+    }
+
+    try:
+        resp = requests.post(
+            "https://api.dingtalk.com/v1.0/robot/messageFiles/download",
+            headers=headers,
+            json=body,
+            timeout=15,
+        )
+        data = resp.json()
+        if resp.status_code != 200:
+            logger.error("获取下载链接失败 [status=%d]: %s", resp.status_code, resp.text[:300])
+            return None
+
+        download_url = data.get("downloadUrl")
+        if not download_url:
+            logger.error("下载链接为空: %s", resp.text[:300])
+            return None
+
+        file_resp = requests.get(download_url, timeout=20)
+        if file_resp.status_code != 200 or not file_resp.content:
+            logger.error("文件内容下载失败 [status=%d]", file_resp.status_code)
+            return None
+
+        safe_name = "".join(c if c.isalnum() else "_" for c in download_code[:32])
+        filename = f"{safe_name}.{file_extension}"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        with open(filepath, "wb") as f:
+            f.write(file_resp.content)
+        logger.info("文件下载成功: %s (%d bytes)", filename, len(file_resp.content))
+        return f"/static/uploads/{filename}"
+
+    except Exception as e:
+        logger.error("下载文件异常: %s", e)
     return None
 
 
@@ -85,6 +145,7 @@ def _reply_via_webhook(session_key: str, text: str) -> bool:
 
     webhook = session.get("webhook")
     sender_staff_id = session.get("sender_staff_id")
+    conversation_type = session.get("conversation_type", "1")
 
     if not webhook:
         logger.warning("webhook 为空，无法回复: %s", session_key)
@@ -102,6 +163,17 @@ def _reply_via_webhook(session_key: str, text: str) -> bool:
         resp = requests.post(webhook, headers=headers, data=json.dumps(payload), timeout=10)
         resp.raise_for_status()
         logger.info("回复成功 → %s: %s", session_key, text)
+
+        _push_message({
+            "id": _next_id(),
+            "ts": datetime.now().strftime("%H:%M:%S"),
+            "direction": "out",
+            "sender": "我",
+            "session_key": session_key,
+            "conversation_type": conversation_type,
+            "text": text,
+            "msg_type": "text",
+        })
         return True
     except Exception as e:
         logger.error("回复失败: %s", e)
@@ -165,22 +237,25 @@ class MyMessageHandler(dingtalk_stream.ChatbotHandler):
         elif msg_type == "audio":
             download_code = ""
             duration = 0
+            recognition = ""
             if incoming.text:
                 try:
                     download_code = incoming.text.get("downloadCode", "")
                     duration = incoming.text.get("duration", 0)
+                    recognition = incoming.text.get("recognition", "")
                 except (AttributeError, KeyError):
                     download_code = ""
             if not download_code:
                 content = data.get("content", {}) if isinstance(data.get("content"), dict) else {}
                 download_code = content.get("downloadCode", "")
                 duration = content.get("duration", 0)
+                recognition = content.get("recognition", "")
             if download_code:
                 file_url = _download_dingtalk_file(download_code, "amr")
-                msg_content["text"] = f"[语音 {duration}秒]"
+                msg_content["text"] = recognition if recognition else f"[语音 {duration}秒]"
                 msg_content["file_url"] = file_url
                 msg_content["duration"] = duration
-                logger.info("收到语音 | 发送人: %s | duration: %s", sender, duration)
+                logger.info("收到语音 | 发送人: %s | recognition: %s", sender, recognition)
             else:
                 msg_content["text"] = "[语音]"
 
