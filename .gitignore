@@ -2,3 +2,4 @@ config.py
 .workbuddy
 .trae
 __pycache__
+static/uploads/

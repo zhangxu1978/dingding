@@ -170,6 +170,11 @@
     }
 
     /* ── 语音消息 ─────────────────────────────────────────── */
+    .msg-audio-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
     .msg-audio {
       display: flex;
       align-items: center;
@@ -188,6 +193,7 @@
     }
     .msg-audio .play-btn svg { fill: #fff; width: 14px; height: 14px; }
     .msg-audio .duration { font-size: 12px; color: #8c8c8c; }
+    .msg-recognition { font-size: 13px; color: #595959; line-height: 1.5; padding: 0 4px; }
     .msg-row.in  .msg-audio .play-btn { background: #fa8c16; }
     .msg-audio.playing .play-btn { background: #52c41a; }
 
@@ -535,9 +541,12 @@ function renderMsgBubble(m) {
   }
   if (m.msg_type === "audio" && m.file_url) {
     const dur = m.duration ? m.duration + "秒" : "";
-    return `<div class="msg-audio" onclick="playAudio(this, '${escHtml(m.file_url)}')">
-      <button class="play-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
-      <span class="duration">${escHtml(dur)}</span>
+    return `<div class="msg-audio-wrap">
+      <div class="msg-audio" onclick="playAudio(this, '${escHtml(m.file_url)}')">
+        <button class="play-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+        <span class="duration">${escHtml(dur)}</span>
+      </div>
+      ${m.text ? `<div class="msg-recognition">${escHtml(m.text)}</div>` : ""}
     </div>`;
   }
   return escHtml(m.text || "");
