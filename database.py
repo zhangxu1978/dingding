@@ -26,6 +26,16 @@ def _get_conn() -> sqlite3.Connection:
 
 def init_db():
     conn = _get_conn()
+    # 兼容旧数据库，添加缺失的列
+    try:
+        conn.execute("ALTER TABLE messages ADD COLUMN need_auto_reply INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE messages ADD COLUMN auto_reply_completed INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

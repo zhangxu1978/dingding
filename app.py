@@ -14,6 +14,7 @@ import database
 import threading
 import time
 import logging
+import requests
 from dingtalk_bot import get_messages, reply_to_session, start_bot_thread
 
 logger = logging.getLogger("auto-reply")
@@ -32,15 +33,27 @@ def _auto_reply_scan():
             for session_key, messages in pending.items():
                 # 合并文本
                 texts = [m.get("text", "") for m in messages if m.get("text")]
-                if texts:
-                    # 生成带消息ID的session_key
-                    message_ids = [m["id"] for m in messages]
-                    id_str = ",".join(map(str, message_ids))
-                    api_session_key = f"{session_key}-{id_str}"
-                    combined_text = "\n".join(texts)
-                    logger.info(f"待自动回复 [{api_session_key}]: {combined_text[:100]}...")
-                    # TODO: 调用自动回复 API
-                    # 这里先留空，后续添加
+                if not texts:
+                    continue
+                # 生成带消息ID的session_key
+                message_ids = [m["id"] for m in messages]
+                id_str = ",".join(map(str, message_ids))
+                api_session_key = f"{session_key}-{id_str}"
+                combined_text = "\n".join(texts)
+                logger.info(f"待自动回复 [{api_session_key}]: {combined_text[:100]}...")
+                # 调用自动回复 API
+                try:
+                    resp = requests.post(
+                        config.AUTO_REPLY_API_URL,
+                        json={"session_key": api_session_key, "message": combined_text},
+                        timeout=30
+                    )
+                    if resp.status_code == 200:
+                        logger.info(f"自动回复请求发送成功: {api_session_key}")
+                    else:
+                        logger.warning(f"自动回复请求失败 [{resp.status_code}]: {resp.text[:200]}")
+                except Exception as e:
+                    logger.error(f"调用自动回复API异常: {e}")
             time.sleep(config.AUTO_REPLY_SCAN_INTERVAL)
         except Exception as e:
             logger.error(f"自动回复扫描异常: {e}")
