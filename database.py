@@ -6,7 +6,7 @@ SQLite 数据库模块 — 记录所有对话消息。
 
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from threading import Lock
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -14,6 +14,11 @@ DB_PATH = os.path.join(BASE_DIR, "messages.db")
 
 _db_lock = Lock()
 _conn: sqlite3.Connection | None = None
+
+
+def _get_shanghai_now() -> str:
+    tz = timezone(timedelta(hours=8))
+    return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -51,7 +56,7 @@ def init_db():
             duration INTEGER,
             need_auto_reply INTEGER DEFAULT 0,
             auto_reply_completed INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT
         )
     """)
     conn.execute("""
@@ -72,8 +77,8 @@ def save_message(msg: dict):
         conn.execute("""
             INSERT INTO messages (msg_id, ts, direction, sender, session_key,
                                    conversation_type, msg_type, text, file_url, duration,
-                                   need_auto_reply, auto_reply_completed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   need_auto_reply, auto_reply_completed, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             msg.get("id"),
             msg.get("ts", ""),
@@ -87,6 +92,7 @@ def save_message(msg: dict):
             msg.get("duration"),
             msg.get("need_auto_reply", 0),
             msg.get("auto_reply_completed", 0),
+            _get_shanghai_now(),
         ))
         conn.commit()
 
