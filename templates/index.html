@@ -291,11 +291,114 @@
       pointer-events: none;
       z-index: 999;
     }
+    #toast { opacity: 0; }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #d9d9d9; border-radius: 3px; }
+
+    /* ── 设置弹窗 ─────────────────────────────────────────── */
+    #settings-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    #settings-box {
+      background: #fff;
+      border-radius: 12px;
+      width: 420px;
+      max-width: 90vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,.15);
+      overflow: hidden;
+    }
+    #settings-header {
+      padding: 16px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #262626;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #settings-header .close-btn {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      font-size: 20px;
+      color: #8c8c8c;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #settings-header .close-btn:hover { background: #f5f5f5; }
+    #settings-body { padding: 20px; }
+    .setting-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .setting-item:last-child { border-bottom: none; }
+    .setting-label { font-size: 14px; color: #262626; }
+    .setting-desc { font-size: 12px; color: #8c8c8c; margin-top: 2px; }
+    .toggle-switch {
+      position: relative;
+      width: 44px; height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #d9d9d9;
+      border-radius: 12px;
+      transition: background .2s;
+    }
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      width: 20px; height: 20px;
+      left: 2px; top: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform .2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: #1677ff; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+    #reply-input:disabled { background: #f5f5f5; color: #bfbfbf; cursor: not-allowed; }
+    #send-btn:disabled { background: #d9d9d9; cursor: not-allowed; }
+
+    .sidebar-tab {
+      flex: 1;
+      padding: 10px 0;
+      text-align: center;
+      font-size: 13px;
+      color: #8c8c8c;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+    .sidebar-tab:hover { color: #595959; }
+    .sidebar-tab.active { color: #1677ff; border-bottom-color: #1677ff; font-weight: 500; }
+
+    .history-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid #f5f5f5;
+      transition: background .15s;
+    }
+    .history-item:hover { background: #f7f8fa; }
+    .history-item.active { background: #e6f4ff; }
   </style>
 </head>
 <body>
@@ -305,10 +408,16 @@
   <div id="sidebar-header">
     <span class="dot"></span>
     <span>钉钉消息助手</span>
+    <button id="settings-btn" onclick="openSettings()" style="margin-left:auto;background:transparent;border:none;cursor:pointer;color:#595959;padding:4px;border-radius:4px;display:flex;align-items:center;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+    </button>
   </div>
-  <div id="session-list">
-    <!-- 由 JS 动态渲染 -->
+  <div id="sidebar-tabs" style="display:flex;border-bottom:1px solid #f0f0f0;">
+    <div class="sidebar-tab active" id="tab-sessions" onclick="switchTab('sessions')">当前会话</div>
+    <div class="sidebar-tab" id="tab-history" onclick="switchTab('history')">历史记录</div>
   </div>
+  <div id="session-list"></div>
+  <div id="history-list" style="display:none;flex:1;overflow-y:auto;"></div>
 </div>
 
 <!-- 主聊天区 -->
@@ -342,6 +451,27 @@
   <img id="preview-img" src="" alt="预览">
 </div>
 
+<div id="settings-overlay">
+  <div id="settings-box">
+    <div id="settings-header">
+      <span>设置</span>
+      <button class="close-btn" onclick="closeSettings()">×</button>
+    </div>
+    <div id="settings-body">
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">自动回复</div>
+          <div class="setting-desc">开启后，输入框和发送按钮将不可用</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="auto-reply-toggle" onchange="onAutoReplyChange(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
 // 状态
@@ -350,6 +480,9 @@ let sessions    = {};        // session_key -> { sender, conversation_type, mess
 let activeKey   = null;
 let lastId      = 0;
 let pollTimer   = null;
+let currentTab  = "sessions";
+let historyPage = 1;
+let historyActiveKey = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 工具
@@ -391,6 +524,82 @@ function renderSidebar() {
   }).join("");
 }
 
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById("tab-sessions").classList.toggle("active", tab === "sessions");
+  document.getElementById("tab-history").classList.toggle("active", tab === "history");
+  document.getElementById("session-list").style.display = tab === "sessions" ? "" : "none";
+  document.getElementById("history-list").style.display = tab === "history" ? "" : "none";
+  if (tab === "history") {
+    loadHistorySessions();
+  } else {
+    renderSidebar();
+  }
+}
+
+async function loadHistorySessions() {
+  const container = document.getElementById("history-list");
+  container.innerHTML = '<div style="padding:24px 16px;color:#bfbfbf;font-size:13px;text-align:center;">加载中…</div>';
+  try {
+    const res = await fetch(`/api/history/sessions?page=${historyPage}`);
+    const data = await res.json();
+    if (!data.sessions || data.sessions.length === 0) {
+      container.innerHTML = '<div style="padding:24px 16px;color:#bfbfbf;font-size:13px;text-align:center;">暂无历史会话</div>';
+      return;
+    }
+    container.innerHTML = data.sessions.map(s => {
+      const time = s.last_time ? s.last_time.slice(0, 16).replace("T", " ") : "";
+      return `
+        <div class="history-item ${s.session_key === historyActiveKey ? "active" : ""}" onclick="selectHistorySession('${escHtml(s.session_key)}')">
+          <div class="session-name">${escHtml(s.sender)} <span style="font-size:11px;color:#8c8c8c;">(${s.conversation_type === "2" ? "群聊" : "单聊"})</span></div>
+          <div class="session-preview">${s.msg_count} 条消息 · ${time}</div>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    container.innerHTML = '<div style="padding:24px 16px;color:#bfbfbf;font-size:13px;text-align:center;">加载失败</div>';
+  }
+}
+
+async function selectHistorySession(sessionKey) {
+  historyActiveKey = sessionKey;
+  const container = document.getElementById("history-list");
+  container.querySelectorAll(".history-item").forEach(el => el.classList.remove("active"));
+  event.currentTarget.classList.add("active");
+  try {
+    const res = await fetch(`/api/history/messages?session_key=${encodeURIComponent(sessionKey)}`);
+    const data = await res.json();
+    document.getElementById("empty-state").style.display = "none";
+    document.getElementById("messages").style.display = "flex";
+    document.getElementById("input-area").style.display = "none";
+    const chatTitle = document.getElementById("chat-title");
+    const chatTag = document.getElementById("chat-type-tag");
+    const sess = data.messages && data.messages.length > 0 ? data.messages[0] : null;
+    chatTitle.textContent = sess ? sess.sender : "历史会话";
+    chatTag.textContent = sess && sess.conversation_type === "2" ? "群聊" : "单聊";
+    chatTag.style.display = sess ? "inline-block" : "none";
+    renderHistoryMessages(data.messages || []);
+  } catch (e) {
+    toast("加载历史消息失败", 3000);
+  }
+}
+
+function renderHistoryMessages(messages) {
+  const container = document.getElementById("messages");
+  if (!messages || messages.length === 0) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#bfbfbf;">暂无消息</div>';
+    return;
+  }
+  container.innerHTML = messages.map(m => `
+    <div class="msg-row ${m.direction}">
+      <div class="msg-avatar">${avatarLetter(m.sender)}</div>
+      <div class="msg-body">
+        <div class="msg-meta"><span>${escHtml(m.sender)}</span><span>${m.ts || ""}</span></div>
+        <div class="msg-bubble">${renderMsgBubble(m)}</div>
+      </div>
+    </div>`).join("");
+  container.scrollTop = container.scrollHeight;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 切换会话
 // ─────────────────────────────────────────────────────────────────────────────
@@ -400,15 +609,14 @@ function selectSession(key) {
   s.unread = 0;
   renderSidebar();
   renderMessages();
-  // 显示聊天区
   document.getElementById("empty-state").style.display = "none";
   document.getElementById("messages").style.display = "flex";
   document.getElementById("input-area").style.display = "flex";
-  // 更新 header
   document.getElementById("chat-title").textContent = s.sender;
   const tag = document.getElementById("chat-type-tag");
   tag.textContent = s.conversation_type === "2" ? "群聊" : "单聊";
   tag.style.display = "inline-block";
+  updateInputAreaState();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -573,6 +781,41 @@ function playAudio(el, url) {
   el._audio = audio;
   audio.onended = () => el.classList.remove("playing");
   audio.play();
+}
+
+let autoReplyEnabled = false;
+
+function openSettings() {
+  document.getElementById("settings-overlay").style.display = "flex";
+  fetch("/api/config")
+    .then(r => r.json())
+    .then(data => {
+      autoReplyEnabled = !!data.AUTO_REPLY;
+      document.getElementById("auto-reply-toggle").checked = autoReplyEnabled;
+    });
+}
+
+function closeSettings() {
+  document.getElementById("settings-overlay").style.display = "none";
+}
+
+function onAutoReplyChange(enabled) {
+  autoReplyEnabled = enabled;
+  updateInputAreaState();
+  fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ AUTO_REPLY: enabled }),
+  }).then(r => r.json()).then(data => {
+    if (data.ok) toast(enabled ? "自动回复已开启" : "自动回复已关闭");
+  });
+}
+
+function updateInputAreaState() {
+  const input = document.getElementById("reply-input");
+  const sendBtn = document.getElementById("send-btn");
+  if (input) input.disabled = autoReplyEnabled;
+  if (sendBtn) sendBtn.disabled = autoReplyEnabled;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

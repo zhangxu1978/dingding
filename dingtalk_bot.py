@@ -22,6 +22,7 @@ import dingtalk_stream
 from dingtalk_stream import AckMessage
 
 import config
+import database
 
 logging.basicConfig(
     level=logging.INFO,
@@ -174,6 +175,7 @@ def _reply_via_webhook(session_key: str, text: str) -> bool:
             "text": text,
             "msg_type": "text",
         })
+        database.save_message(_message_store[-1])
         return True
     except Exception as e:
         logger.error("回复失败: %s", e)
@@ -210,7 +212,9 @@ class MyMessageHandler(dingtalk_stream.ChatbotHandler):
 
         msg_content = {"id": _next_id(), "ts": datetime.now().strftime("%H:%M:%S"),
                        "direction": "in", "sender": sender, "session_key": session_key,
-                       "conversation_type": conversation_type, "msg_type": msg_type}
+                       "conversation_type": conversation_type, "msg_type": msg_type,
+                       "need_auto_reply": 1 if config.AUTO_REPLY else 0,
+                       "auto_reply_completed": 0}
 
         if msg_type == "text":
             text = incoming.text.content.strip() if incoming.text else ""
@@ -281,6 +285,7 @@ class MyMessageHandler(dingtalk_stream.ChatbotHandler):
             logger.info("收到未知类型消息 | 发送人: %s | 类型: %s", sender, msg_type)
 
         _push_message(msg_content)
+        database.save_message(msg_content)
         return AckMessage.STATUS_OK, "OK"
 
 
